@@ -44,7 +44,7 @@ RUN dotnet publish ./src/Sas.csproj \
     -o /app/publish
 
 # ---------- runtime stage ----------
-FROM alpine:${ALPINE_VERSION}
+FROM alpine:3.22
 
 WORKDIR /app
 
@@ -52,45 +52,15 @@ RUN apk add --no-cache \
       ca-certificates \
       libgcc \
       libstdc++ \
-      zlib \
-      icu-libs \
-      tzdata && \
+      zlib && \
     addgroup -S sas && \
     adduser -S -D -h /home/sas -s /sbin/nologin -G sas sas && \
-    mkdir -p /home/sas/.sas
+    mkdir -p /home/sas/.sas && \
+    chown -R sas:sas /home/sas/.sas
 
-COPY --from=build /app/publish/ /app/
+COPY --from=build --chown=sas:sas --chmod=755 /app/publish/Sas /app/Sas
 
-RUN cat > /usr/local/bin/docker-entrypoint.sh <<'EOF'
-#!/bin/sh
-set -eu
-
-ARGS=""
-
-append_arg() {
-    name="$1"
-    value="$2"
-
-    if [ -n "$value" ]; then
-        ARGS="$ARGS $name $value"
-    fi
-}
-
-append_arg "--server-uid" "${SAS_SERVER_UID:-}"
-append_arg "--server-callsign" "${SAS_SERVER_CALLSIGN:-}"
-append_arg "--mqtt-host" "${SAS_MQTT_HOST:-}"
-append_arg "--mqtt-port" "${SAS_MQTT_PORT:-}"
-append_arg "--mqtt-username" "${SAS_MQTT_USERNAME:-}"
-append_arg "--mqtt-password" "${SAS_MQTT_PASSWORD:-}"
-append_arg "--cert-fingerprint" "${SAS_CERT_FINGERPRINT:-}"
-append_arg "--http-addr" "${SAS_HTTP_ADDR:-0.0.0.0}"
-append_arg "--http-port" "${SAS_HTTP_PORT:-8080}"
-
-exec /app/Sas $ARGS "$@"
-EOF
-
-RUN chmod +x /app/Sas /usr/local/bin/docker-entrypoint.sh && \
-    chown -R sas:sas /app /home/sas/.sas /usr/local/bin/docker-entrypoint.sh
+COPY --chown=root:root --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
 USER sas
 
