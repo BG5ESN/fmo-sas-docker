@@ -1,11 +1,12 @@
 # syntax=docker/dockerfile:1
 
 ARG DOTNET_VERSION=10.0
+ARG ALPINE_VERSION=3.22
 ARG REPO_URL=https://github.com/BG5ESN/fmo-server-authrozier-service.git
 ARG REPO_REF=main
 
 # ---------- build stage ----------
-FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION} AS build
+FROM mcr.microsoft.com/dotnet/sdk:${DOTNET_VERSION}-alpine AS build
 
 ARG REPO_URL
 ARG REPO_REF
@@ -14,9 +15,7 @@ ARG RUNTIME_ID
 
 WORKDIR /src
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends git ca-certificates && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache git ca-certificates
 
 RUN git clone --depth 1 --branch "${REPO_REF}" "${REPO_URL}" repo
 
@@ -24,8 +23,8 @@ WORKDIR /src/repo
 
 RUN if [ -z "$RUNTIME_ID" ]; then \
       case "$TARGETARCH" in \
-        amd64) echo "linux-x64" > /tmp/rid ;; \
-        arm64) echo "linux-arm64" > /tmp/rid ;; \
+        amd64) echo "linux-musl-x64" > /tmp/rid ;; \
+        arm64) echo "linux-musl-arm64" > /tmp/rid ;; \
         *) echo "Unsupported TARGETARCH=$TARGETARCH" && exit 1 ;; \
       esac; \
     else \
@@ -40,38 +39,57 @@ RUN dotnet publish ./src/Sas.csproj \
     --self-contained true \
     -p:PublishSingleFile=true \
     -p:PublishTrimmed=false \
+    -p:DebugType=None \
+    -p:DebugSymbols=false \
     -o /app/publish
 
 # ---------- runtime stage ----------
-FROM mcr.microsoft.com/dotnet/runtime-deps:${DOTNET_VERSION}
+FROM alpine:${ALPINE_VERSION}
 
 WORKDIR /app
 
-RUN useradd -r -m -d /home/sas -s /usr/sbin/nologin sas
+RUN apk add --no-cache \
+      ca-certificates \
+      libgcc \
+      libstdc++ \
+      zlib \
+      icu-libs \
+      tzdata && \
+    addgroup -S sas && \
+    adduser -S -D -h /home/sas -s /sbin/nologin -G sas sas && \
+    mkdir -p /home/sas/.sas
 
 COPY --from=build /app/publish/ /app/
 
-RUN cat > /usr/local/bin/docker-entrypoint.sh <<'EOF2'
+RUN cat > /usr/local/bin/docker-entrypoint.sh <<'EOF'
 #!/bin/sh
 set -eu
 
-set -- \
-  ${SAS_SERVER_UID:+--server-uid "$SAS_SERVER_UID"} \
-  ${SAS_SERVER_CALLSIGN:+--server-callsign "$SAS_SERVER_CALLSIGN"} \
-  ${SAS_MQTT_HOST:+--mqtt-host "$SAS_MQTT_HOST"} \
-  ${SAS_MQTT_PORT:+--mqtt-port "$SAS_MQTT_PORT"} \
-  ${SAS_MQTT_USERNAME:+--mqtt-username "$SAS_MQTT_USERNAME"} \
-  ${SAS_MQTT_PASSWORD:+--mqtt-password "$SAS_MQTT_PASSWORD"} \
-  ${SAS_CERT_FINGERPRINT:+--cert-fingerprint "$SAS_CERT_FINGERPRINT"} \
-  --http-addr "${SAS_HTTP_ADDR:-0.0.0.0}" \
-  --http-port "${SAS_HTTP_PORT:-8080}" \
-  "$@"
+ARGS=""
 
-exec /app/Sas "$@"
-EOF2
+append_arg() {
+    name="$1"
+    value="$2"
+
+    if [ -n "$value" ]; then
+        ARGS="$ARGS $name $value"
+    fi
+}
+
+append_arg "--server-uid" "${SAS_SERVER_UID:-}"
+append_arg "--server-callsign" "${SAS_SERVER_CALLSIGN:-}"
+append_arg "--mqtt-host" "${SAS_MQTT_HOST:-}"
+append_arg "--mqtt-port" "${SAS_MQTT_PORT:-}"
+append_arg "--mqtt-username" "${SAS_MQTT_USERNAME:-}"
+append_arg "--mqtt-password" "${SAS_MQTT_PASSWORD:-}"
+append_arg "--cert-fingerprint" "${SAS_CERT_FINGERPRINT:-}"
+append_arg "--http-addr" "${SAS_HTTP_ADDR:-0.0.0.0}"
+append_arg "--http-port" "${SAS_HTTP_PORT:-8080}"
+
+exec /app/Sas $ARGS "$@"
+EOF
 
 RUN chmod +x /app/Sas /usr/local/bin/docker-entrypoint.sh && \
-    mkdir -p /home/sas/.sas && \
     chown -R sas:sas /app /home/sas/.sas /usr/local/bin/docker-entrypoint.sh
 
 USER sas
