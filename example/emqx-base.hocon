@@ -1,6 +1,28 @@
+## ---------------------------
+## Dashboard
+## ---------------------------
+
+dashboard {
+  listeners {
+    http {
+      enable = true
+      bind = 18083
+    }
+
+    https {
+      enable = false
+    }
+  }
+}
+
+## ---------------------------
+## Authentication: HTTP -> SAS
+## ---------------------------
+
 authentication = [
   {
     enable = true
+
     mechanism = password_based
     backend = http
 
@@ -9,7 +31,6 @@ authentication = [
 
     headers {
       "Content-Type" = "application/json"
-      "X-Request-Source" = "EMQX"
     }
 
     body {
@@ -17,14 +38,8 @@ authentication = [
       password = "${password}"
     }
 
-    connect_timeout = "5s"
     request_timeout = "5s"
+    connect_timeout = "5s"
     pool_size = 8
-    enable_pipelining = 100
-
-    ssl {
-      enable = false
-      verify = "verify_none"
-    }
   }
 ]
