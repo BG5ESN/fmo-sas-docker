@@ -18,7 +18,7 @@ permissions:
 env:
   REGISTRY: ghcr.io
   # Default image path: ghcr.io/<owner>/<repo>
-  IMAGE_NAME: fmo-sas
+  IMAGE_NAME: xjx00/fmo-sas
 
 jobs:
   docker:
