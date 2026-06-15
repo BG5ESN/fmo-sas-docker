@@ -62,6 +62,10 @@ COPY --from=build --chown=sas:sas --chmod=755 /app/publish/Sas /app/Sas
 
 COPY --chown=root:root --chmod=755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
 
+#copy builtin root CA
+COPY --from=build --chown=sas:sas /src/repo/src/builtin/roots /home/sas/.sas/roots
+COPY --from=build --chown=sas:sas /src/repo/src/builtin/roles /home/sas/.sas/roles
+
 USER sas
 
 ENV HOME=/home/sas

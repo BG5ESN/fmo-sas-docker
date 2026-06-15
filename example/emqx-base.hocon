@@ -1,0 +1,30 @@
+authentication = [
+  {
+    enable = true
+    mechanism = password_based
+    backend = http
+
+    method = post
+    url = "http://fmo-sas:8080/auth"
+
+    headers {
+      "Content-Type" = "application/json"
+      "X-Request-Source" = "EMQX"
+    }
+
+    body {
+      username = "${username}"
+      password = "${password}"
+    }
+
+    connect_timeout = "5s"
+    request_timeout = "5s"
+    pool_size = 8
+    enable_pipelining = 100
+
+    ssl {
+      enable = false
+      verify = "verify_none"
+    }
+  }
+]
