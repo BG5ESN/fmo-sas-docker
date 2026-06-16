@@ -9,6 +9,8 @@
 
 ```bash
 docker pull ghcr.io/xjx00/fmo-sas:latest
+#国内使用
+docker pull registry.cn-hangzhou.aliyuncs.com/xjx00/fmo-sas:beta
 ```
 
 ## 2. 容器端口

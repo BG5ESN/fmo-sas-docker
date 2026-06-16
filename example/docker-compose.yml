@@ -5,31 +5,32 @@ services:
     restart: unless-stopped
     ports:
       - "1883:1883"
+      - "58083:18083"
     volumes:
       - ./emqx-base.hocon:/opt/emqx/etc/base.hocon:ro
     environment:
-      EMQX_LOADED_PLUGINS: "emqx_management,emqx_dashboard"
       EMQX_NODE__NAME: "emqx@emqx"
       EMQX_DASHBOARD__DEFAULT_USERNAME: "emqadmin"
       EMQX_DASHBOARD__DEFAULT_PASSWORD: "emqpasswd"
+    networks:
+      - fmo
 
   fmo-sas:
     image: ghcr.io/xjx00/fmo-sas:latest
     container_name: fmo-sas
     restart: unless-stopped
     networks:
-      - apps
+      - fmo
     expose:
       - "8080"
     environment:
       SAS_SERVER_UID: "<ID>"
       SAS_SERVER_CALLSIGN: "<CALLSIGN>"
-      SAS_MQTT_HOST: "<MQTT HOST>"
-      SAS_MQTT_PORT: "<MQTT PORT>"
+      SAS_MQTT_HOST: "emqx"
+      SAS_MQTT_PORT: "1883"
       SAS_CERT_FINGERPRINT: "<CERT FP>"
       SAS_HTTP_ADDR: "0.0.0.0"
       SAS_HTTP_PORT: "8080"
 
 networks:
-  apps:
-    external: true
+  fmo: 
